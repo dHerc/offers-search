@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\Experiment\ExperimentModificationResult;
+use App\Console\Commands\Experiment\ExperimentQueryResult;
 use App\Console\Commands\Experiment\ExperimentResult;
+use App\Console\Commands\Experiment\ExperimentScores;
+use App\Console\Commands\Experiment\ExperimentType;
 use App\Services\QueryService;
 use App\Services\QueryTransformers\BM25RM3QueryTransformer;
 use App\Services\QueryTransformers\ChatbotAddWordsQueryTransformer;
@@ -21,6 +23,7 @@ use App\Services\QueryTransformers\ToBaseWordQueryTransformer;
 use App\Services\ScoringService;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
+use RuntimeException;
 
 class Experiment extends Command
 {
@@ -63,12 +66,12 @@ class Experiment extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): void
     {
         $option = $this->argument('option');
         $transformer = self::TRANSFORMERS[$option] ?? null;
         if (!$transformer) {
-            throw new \RuntimeException("No transformer found for given option: $option");
+            throw new RuntimeException("No transformer found for given option: $option");
         }
         $transformer = new $transformer();
         $query = $this->argument('query');
@@ -76,97 +79,64 @@ class Experiment extends Command
     }
 
     /**
-     * @param $transformer
-     * @param string $query
      * @return array{ExperimentResult, ExperimentResult}
      */
-    public function runExperiment($transformer, string $query): array
+    public function runExperiment(QueryTransformerInterface $transformer, string $query): array
     {
-        [ 'score' => $baseScore, 'results' => $baseResult, 'time' => $baseTime ] = $this->getEmbeddingsScore($query);
-        [ 'score' => $fulltextScore, 'results' => $fulltextResults, 'time' => $fulltextTime ] = $this->getFulltextScore($query);
+        return [
+            $this->getResult($transformer, ExperimentType::FULLTEXT, $query),
+            $this->getResult($transformer, ExperimentType::EMBEDDINGS, $query),
+        ];
+    }
+
+    private function getResult(QueryTransformerInterface $transformer, ExperimentType $type, string $query): ExperimentResult
+    {
+        $fullStart = microtime(true);
+        [ 'scores' => $scores, 'results' => $results, 'time' => $time ] = $this->getScore($type, $query);
         $start = microtime(true);
-        $newQueries = $transformer->transform($query, $baseResult);
+        $newQueries = $transformer->transform($query, $results);
         $transformTime = (microtime(true) - $start) * 1_000_000;
-        $baseResult = new ExperimentResult(
-            'embedding',
+        $fullTime = (microtime(true) - $fullStart) * 1_000_000;
+        $result = new ExperimentResult(
+            $type,
             $transformer::class,
             $query,
-            $baseScore,
-            $baseTime,
-            $transformTime
-        );
-        $fulltextResult = new ExperimentResult(
-            'fulltext',
-            $transformer::class,
-            $query,
-            $fulltextScore,
-            $fulltextTime,
-            $transformTime
+            $scores,
+            $time,
+            $transformTime,
+            $fullTime
         );
         if (!is_array($newQueries)) {
             $newQueries = [$newQueries];
         }
         foreach ($newQueries as $newQuery) {
-            ['score' => $newScore, 'time' => $newTime] = $this->getEmbeddingsScore($newQuery);
-            $newResult = new ExperimentModificationResult(
+            ['scores' => $newScores, 'time' => $newTime] = $this->getScore($type, $newQuery);
+            $newResult = new ExperimentQueryResult(
                 $newQuery,
-                $newScore,
+                $newScores,
                 $newTime
             );
-            $baseResult->suggestions[] = $newResult;
+            $result->suggestions[] = $newResult;
         }
-        $newFulltextQueries = $transformer->transform($query, $fulltextResults);
-        if (!is_array($newFulltextQueries)) {
-            $newFulltextQueries = [$newFulltextQueries];
-        }
-        foreach ($newFulltextQueries as $newFulltextQuery) {
-            ['score' => $newFulltextScore, 'time' => $newFulltextTime] = $this->getFulltextScore($newFulltextQuery);
-            $newFulltextResult = new ExperimentModificationResult(
-                $newFulltextQuery,
-                $newFulltextScore,
-                $newFulltextTime
-            );
-            $fulltextResult->suggestions[] = $newFulltextResult;
-        }
-        return [
-            $baseResult,
-            $fulltextResult
-        ];
+        return $result;
     }
 
     /**
-     * @param string $query
-     * @return array{'score': float, 'results': Collection, 'time': float, 'count': int}
+     * @return array{'scores': ExperimentScores, 'results': Collection, 'time': float}
      */
-    private function getEmbeddingsScore(string $query): array
+    private function getScore(ExperimentType $type, string $query): array
     {
         $start = microtime(true);
-        $baseResult = QueryService::getOffers($query);
+        $results = match ($type) {
+            ExperimentType::EMBEDDINGS => QueryService::getOffers($query),
+            ExperimentType::FULLTEXT => QueryService::getOffersByFullText($query)
+        };
         $time = (microtime(true) - $start) * 1_000_000;
-        $baseScore = ScoringService::scoreResults($query, $baseResult->all(), $baseResult->count());
+        $scores = ScoringService::scoreResults($query, $results->all());
         return [
-            'score' => $baseScore,
-            'results' => $baseResult,
-            'time' => $time,
-            'count' => $baseResult->count()
-        ];
-    }
-
-    /**
-     * @param string $query
-     * @return array{'score': float, 'results': Collection, 'time': float, 'count': int}
-     */
-    private function getFulltextScore(string $query): array
-    {
-        $start = microtime(true);
-        $baseResult = QueryService::getOffersByFullText($query);
-        $time = (microtime(true) - $start) * 1_000_000;
-        $baseScore = ScoringService::scoreResults($query, $baseResult->all(), $baseResult->count());
-        return [
-            'score' => $baseScore,
-            'results' => $baseResult,
-            'time' => $time,
-            'count' => $baseResult->count()
+            'scores' => $scores,
+            'results' => $results,
+            'time' => $time
         ];
     }
 }

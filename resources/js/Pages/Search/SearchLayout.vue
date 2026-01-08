@@ -5,12 +5,13 @@ import {Head, router} from "@inertiajs/vue3";
 import {PagedOffers} from "@/types/Offers";
 import {computed, PropType, ref, watch} from "vue";
 
-const { offers, search, loadingSearch, time } = defineProps({
+const { offers, search, loadingSearch, time, score } = defineProps({
     offers: Object as PropType<PagedOffers>,
     title: String,
     search: String,
     loadingSearch: Boolean,
-    time: Number
+    time: Number,
+    score: Number
 });
 const pages = computed(() => offers ? Array.from(Array(offers.last_page).keys()).map((x) => x+1) : []);
 const selectedPage = ref(offers?.current_page);
@@ -97,7 +98,7 @@ const goToSelectedPage = (offset: number = 0) => {
                 </div>
                 <div class="text-white w-full grid justify-center" v-if="offers?.data.length">
                     <div class="w-full pb-2 text-gray-900 dark:text-gray-100 text-center">
-                        Found offers: {{offers?.total}} in {{time}} seconds
+                        Found offers: {{offers?.total}} in {{time}} seconds (quality: {{Math.round((score ?? 0) * 100).toFixed(0)}})
                     </div>
                     <div class="grid align-center" style="grid-template-columns: repeat(5, min-content);">
                         <a class="text-3xl" v-if="(offers?.current_page ?? 0) > 2" @click="goToPage(1)">

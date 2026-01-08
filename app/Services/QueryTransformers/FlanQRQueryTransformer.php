@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Collection;
 class FlanQRQueryTransformer implements QueryTransformerInterface
 {
 
-    public function transform(string $query, ?Collection $results = null): string|array
+    public function transform(string $query, ?Collection $results = null): array
     {
-        return FlanT5Service::getSuggestion($query);
+        return [FlanT5Service::getSuggestion($query)];
     }
 }

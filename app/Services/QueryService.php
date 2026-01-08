@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 class QueryService
 {
-    public static function getOffers(string $query, int | null $paginate = null): LengthAwarePaginator | Collection
+    public static function getOffers(string $query): LengthAwarePaginator | Collection
     {
         DB::statement('SET hnsw.ef_search = 250');
         $embeddingVector = '[' . EmbeddingService::generateEmbeddings($query) . ']';
@@ -20,15 +20,13 @@ class QueryService
             )->orderBy('cosine_distance')->limit(1000),
             'offers'
         )->where('cosine_distance', '<=', 0.4);
-        if (!$paginate) {
-            return $baseQuery->get();
-        }
-        return $baseQuery->paginate($paginate);
+        return $baseQuery->get();
     }
 
     public static function getOffersByFullText(string $query): Collection
     {
-        $fixedQuery = implode(' & ', explode(' ', preg_replace('/[^a-zA-Z0-9-_]/', '', $query)));
+        $fixedWords = array_filter(explode(' ', preg_replace('/[^a-zA-Z0-9-_ ]/', '', $query)), fn ($item) => !empty(trim($item)));
+        $fixedQuery = implode(' & ', $fixedWords);
         $embeddingVector = '[' . EmbeddingService::generateEmbeddings($query) . ']';
         return Offer::query()->selectRaw(
             '*, embeddings <=> ? AS cosine_distance',

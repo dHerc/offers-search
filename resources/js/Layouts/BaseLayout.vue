@@ -67,7 +67,7 @@ const showingNavigationDropdown = ref(false);
                                     :href="route('offers.words_to_base')"
                                     :active="route().current('offers.words_to_base')"
                                 >
-                                    Bring words to base form
+                                    Bring words to&nbspbase
                                 </NavLink>
                                 <NavLink
                                     :href="route('offers.bm25rm3')"
@@ -98,6 +98,18 @@ const showingNavigationDropdown = ref(false);
                                     :active="route().current('offers.ngrams')"
                                 >
                                     Ngrams
+                                </NavLink>
+                                <NavLink
+                                    :href="route('offers.hybrid-embeddings')"
+                                    :active="route().current('offers.hybrid-embeddings')"
+                                >
+                                    Hybrid (embeddings)
+                                </NavLink>
+                                <NavLink
+                                    :href="route('offers.hybrid-fulltext')"
+                                    :active="route().current('offers.hybrid-fulltext')"
+                                >
+                                    Hybrid (fulltext)
                                 </NavLink>
                             </div>
                         </div>

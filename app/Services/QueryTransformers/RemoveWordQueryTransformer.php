@@ -35,7 +35,7 @@ class RemoveWordQueryTransformer implements QueryTransformerInterface
      * @param Collection<Offer> $results
      * @return string[]
      */
-    public function getWordsToRemove(string $query, Collection $results): array {
+    private function getWordsToRemove(string $query, Collection $results): array {
         $words = array_unique(explode(' ', $query));
         $wordsWithRelevance = [];
         foreach ($words as $word) {

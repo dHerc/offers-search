@@ -8,51 +8,57 @@ use Illuminate\Database\Eloquent\Collection;
 
 class NGramsQueryTransformer implements QueryTransformerInterface
 {
+    //TODO restore
     private const int WORDS_TO_PICK = 10;
-    private const array WORDS_TO_SKIP = ['to', 'of', 'for', 'and', 'the', 'be', 'a', 'with'];
+    private const array WORDS_TO_SKIP = ['to', 'of', 'for', 'and', 'the', 'be', 'a', 'with', 'in'];
     /**
      * @inheritDoc
      */
-    public function transform(string $query, ?Collection $results = null): string|array
+    public function transform(string $query, ?Collection $results = null): array
     {
         $words = explode(' ', $query);
-        $allCooccurrences = array_map(
-            fn(string $word) => $this->getMostCommonWords(
-                $word,
-                array_filter($words, fn(string $currentWord) => $word !== $currentWord)
-            ),
-            $words
-        );
-        $flatOccurrences = array_merge(...$allCooccurrences);
-        usort($flatOccurrences, function (WordCooccurrence $a, WordCooccurrence $b) {
-            return $b->frequency - $a->frequency;
-        });
-        $pickedOptions = array_slice($flatOccurrences, 0, self::WORDS_TO_PICK);
-        return array_map(fn(WordCooccurrence $option) => $this->integrateNewWord($query, $option), $pickedOptions);
+        $allCooccurrences = $this->getMostCommonWords(array_filter($words, fn ($word) => !in_array($word, self::WORDS_TO_SKIP)));
+        return array_map(fn(WordCooccurrence $option) => $this->integrateNewWord($query, $option), $allCooccurrences);
     }
 
     /**
-     * @param string $word
      * @return WordCooccurrence[]
      */
-    public function getMostCommonWords(string $word, array $remainingWords): array
+    public function getMostCommonWords(array $words): array
     {
-        $wordsToSkip = [...$remainingWords, ...self::WORDS_TO_SKIP];
+        $combinations = $this->getAmountOfCombinations(count($words));
         $wordAOptions =  WordCooccurrence::query()
-            ->where('word_a', '=', $word)
+            ->whereIn('word_a', $words)
             ->orderBy('frequency', 'desc')
-            ->limit(self::WORDS_TO_PICK + count($wordsToSkip))
+            ->limit(self::WORDS_TO_PICK + $combinations + count(self::WORDS_TO_SKIP) * count($words))
             ->get();
         $wordBOptions = WordCooccurrence::query()
-            ->where('word_b', '=', $word)
+            ->whereIn('word_b', $words)
             ->orderBy('frequency', 'desc')
-            ->limit(self::WORDS_TO_PICK + count($wordsToSkip))
+            ->limit(self::WORDS_TO_PICK + $combinations + count(self::WORDS_TO_SKIP) * count($words))
             ->get();
         $allOptions = $wordAOptions
             ->concat($wordBOptions)
-            ->filter(fn (WordCooccurrence $option) => !in_array($option->word_a, $wordsToSkip) && !in_array($option->word_b, $wordsToSkip))
+            ->filter(fn (WordCooccurrence $option) => !(in_array($option->word_a, $words) && in_array($option->word_b, $words)))
+            ->filter(fn (WordCooccurrence $option) => !in_array($option->word_a, self::WORDS_TO_SKIP) && !in_array($option->word_b, self::WORDS_TO_SKIP))
             ->sort(fn ($a, $b) => $b->frequency - $a->frequency);
-        return $allOptions->splice(0, 10)->all();
+        return $allOptions->splice(0, self::WORDS_TO_PICK)->all();
+    }
+
+    private function getAmountOfCombinations(int $count)
+    {
+        if ($count === 1) {
+            return 1;
+        }
+        return ($this->factorial($count) / ($this->factorial(2) * $this->factorial($count - 2)));
+    }
+
+    private function factorial(int $n)
+    {
+        if ($n <= 0) {
+            return 1;
+        }
+        return $n * $this->factorial($n - 1);
     }
 
     private function integrateNewWord(string $query, WordCooccurrence $data): string

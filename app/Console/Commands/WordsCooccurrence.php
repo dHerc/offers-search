@@ -36,8 +36,7 @@ class WordsCooccurrence extends Command
         ini_set('memory_limit', '8G');
         echo 'Started loading words occurences' . PHP_EOL;
         $start = (int)Storage::disk('local')->get('words-cooccurrence.txt') + 1;
-        //$maxId = (int)(Offer::query()->selectRaw('MAX(id) as max')->first()->max);
-        $maxId = 35393189;
+        $maxId = (int)(Offer::query()->selectRaw('MAX(id) as max')->first()->max);
         $reader = fopen('D:\\magisterka_db_sorted.csv', 'r');
         for ($i = $start; $i < $maxId; $i += self::BATCH_SIZE) {
             $this->processBatch($i, $i + self::BATCH_SIZE - 1, $reader);

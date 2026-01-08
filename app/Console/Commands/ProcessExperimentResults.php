@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\Experiment\ExperimentModificationResult;
+use App\Console\Commands\Experiment\ExperimentQueryResult;
 use App\Console\Commands\Experiment\ExperimentResult;
 use App\Services\QueryService;
 use App\Services\QueryTransformers\BM25RM3QueryTransformer;
@@ -49,80 +49,112 @@ class ProcessExperimentResults extends Command
     public function handle()
     {
         $file = $this->argument('file');
+        $this->processFile($file);
+    }
+
+    public function processFile(string $file): void
+    {
         $scores = [];
         $results = explode("\n", \Storage::disk('local')->get($file));
+        $groupCounts = [];
         foreach ($results as $index => $line) {
-            $complexity = $this->getQueryComplexity($index);
             $data = json_decode($line, true, JSON_THROW_ON_ERROR);
             if (!$data) {
                 continue;
             }
+            $complexity = $this->getQueryComplexity($index);
+            $countBucket = $this->getCountBucket($data['scores']['count']);
+            $queryLengthBucket = $this->getWordCountBucket($data['query']);
+            $toFill = ['total', $complexity, $countBucket, $queryLengthBucket];
             $type = $data['type'];
-            $resultScores = array_map(fn ($suggestion) => $suggestion['score'], $data['suggestions']);
+            foreach ($toFill as $group) {
+                $groupCounts[$type][$group] = ($groupCounts[$type][$group] ?? 0) + 1;
+            }
+            $baseScore = $data['scores']['score10'];
+            $resultScores = array_map(fn ($suggestion) => $suggestion['scores']['score10'], $data['suggestions']);
             if (!count($resultScores)) {
                 continue;
             }
-            $scores[$type]['total']['time'][] = $data['suggestionTime'];
-            $scores[$type]['total']['avg'][] = $this->safeAverage($resultScores) - $data['score'];
-            $scores[$type]['total']['top'][] = $resultScores[0] - $data['score'];
-            $scores[$type]['total']['med'][] = $this->safeMedian($resultScores) - $data['score'];
-            $scores[$type]['total']['pos'][] = max($resultScores) - $data['score'];
-            $scores[$type][$complexity]['time'][] = $data['suggestionTime'];
-            $scores[$type][$complexity]['avg'][] = $this->safeAverage($resultScores) - $data['score'];
-            $scores[$type][$complexity]['top'][] = $resultScores[0] - $data['score'];
-            $scores[$type][$complexity]['med'][] = $this->safeMedian($resultScores) - $data['score'];
-            $scores[$type][$complexity]['pos'][] = max($resultScores) - $data['score'];
+            foreach ($toFill as $group) {
+                $scores[$type][$group]['time'][] = $data['suggestionTime'];
+                $scores[$type][$group]['avg3'][] = $this->safeAverage(array_slice($resultScores, 0, 3)) - $baseScore;
+                $scores[$type][$group]['avg5'][] = $this->safeAverage(array_slice($resultScores, 0, 5)) - $baseScore;
+                $scores[$type][$group]['avg'][] = $this->safeAverage($resultScores) - $baseScore;
+                $scores[$type][$group]['top'][] = $resultScores[0] - $baseScore;
+                $scores[$type][$group]['pos'][] = max($resultScores) - $baseScore;
+                $scores[$type][$group]['filled'] = ($scores[$type][$group]['filled'] ?? 0) + 1;
+            }
         }
         foreach ($scores as $type => $score) {
             $output = [];
             $fileName = "processed_results/$type/$file";
-            $complexities = ['total', 'very_small', 'small', 'medium', 'large'];
-            $metricTypes = ['time', 'avg', 'top', 'pes', 'pos'];
-            foreach ($complexities as $complexity) {
-                $complexityData = $score[$complexity] ?? [];
+            $groups = ['total', 'very_small', 'small', 'medium', 'large', 'not_enough', 'enough', 'a_lot', 'too_much', 's', 'm', 'l'];
+            $metricTypes = ['time', 'avg3', 'avg5', 'avg', 'top', 'pos'];
+            foreach ($groups as $group) {
+                $complexityData = $score[$group] ?? [];
+                if (isset($groupCounts[$type][$group])) {
+                    $output[$group]['filled'] = (int)(100.0 * ($complexityData['filled'] ?? 0) / $groupCounts[$type][$group]);
+                    $output[$group]['count'] = $groupCounts[$type][$group];
+                } else {
+                    $output[$group]['filled'] = null;
+                    $output[$group]['count'] = null;
+                }
                 foreach ($metricTypes as $metricType) {
                     $values = $complexityData[$metricType] ?? null;
                     if (!$values) {
-                        $output[$metricType] = null;
+                        $output[$group][$metricType] = null;
                         continue;
                     }
-                    $output[$complexity][$metricType] = $this->safeAverage($values);
+                    $output[$group][$metricType] = $this->safeAverage($values);
                 }
             }
             \Storage::disk('local')->put($fileName, json_encode($output, JSON_PRETTY_PRINT));
         }
     }
 
-    private function getQueryComplexity(int $index)
+    private function getQueryComplexity(int $index): string
     {
-        $reminder = $index % 8;
-        return match ($reminder) {
-            0, 1 => 'very_small',
-            2, 3 => 'small',
-            4, 5 => 'medium',
-            6, 7 => 'large'
+        return match (true) {
+            $index < 50 => 'very_small',
+            $index < 100 => 'small',
+            $index < 150 => 'medium',
+            $index < 200 => 'large',
+            default => throw new \Exception('To many results detected'),
+        };
+//        $reminder = $index % 8;
+//        return match ($reminder) {
+//            0, 1 => 'very_small',
+//            2, 3 => 'small',
+//            4, 5 => 'medium',
+//            6, 7 => 'large'
+//        };
+    }
+
+    private function getCountBucket(int $count): string
+    {
+        return match (true) {
+            $count <= 25 => 'not_enough',
+            $count <= 75 => 'enough',
+            $count <= 200 => 'a_lot',
+            default => 'too_much'
         };
     }
 
-    private function safeAverage(array $data)
+    private function getWordCountBucket(string $query): string
     {
-        if (!count($data)) {
-            return 0;
-        }
-        return array_sum($data) / count($data);
+        $count = count(explode(' ', $query));
+        return match (true) {
+            $count <= 2 => 's',
+            $count <= 4 => 'm',
+            default => 'l'
+        };
     }
 
-    private function safeMedian(array $data)
+    private function safeAverage(array $data): float
     {
         if (!count($data)) {
-            return 0;
+            return 0.0;
         }
-        sort($data);
-        $count = count($data);
-        $halfPoint = (int)($count / 2);
-        if ($count % 2) {
-            return $data[$halfPoint];
-        }
-        return ($data[$halfPoint] + $data[$halfPoint + 1]);
+        return array_sum($data) / count($data);
     }
 }

@@ -7,7 +7,7 @@ use Gemini\Client;
 readonly class ChatbotService
 {
     private const array BASE_RULES = [
-        'Ignore any previous messages',
+        'ignore any previous messages',
         'don\'t include any explanation',
         'always generate 10 different variants if possible',
         'separate variants with newline and skip any list headings',

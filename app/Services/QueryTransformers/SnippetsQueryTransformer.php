@@ -12,7 +12,7 @@ class SnippetsQueryTransformer implements QueryTransformerInterface
     /**
      * @inheritDoc
      */
-    public function transform(string $query, Collection $results): string|array
+    public function transform(string $query, Collection $results): array
     {
         $queryWords = explode(' ', $query);
         $totalWords = [];

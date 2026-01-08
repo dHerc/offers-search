@@ -41,6 +41,8 @@ Route::get('offers/flanqr', [OfferController::class, 'flanQRIndex'])->name('offe
 Route::get('offers/flanprf', [OfferController::class, 'flanPRFIndex'])->name('offers.flanprf');
 Route::get('offers/snippets', [OfferController::class, 'snippetsIndex'])->name('offers.snippets');
 Route::get('offers/ngrams', [OfferController::class, 'ngramsIndex'])->name('offers.ngrams');
+Route::get('offers/hybrid-embeddings', [OfferController::class, 'hybridEmbeddingsIndex'])->name('offers.hybrid-embeddings');
+Route::get('offers/hybrid-fulltext', [OfferController::class, 'hybridFulltextIndex'])->name('offers.hybrid-fulltext');
 
 Route::get('raw', [RawController::class, 'getEmbeddings']);
 Route::get('compare', [RawController::class, 'compareEmbeddings']);

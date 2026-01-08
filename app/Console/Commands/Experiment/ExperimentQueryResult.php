@@ -2,11 +2,11 @@
 
 namespace App\Console\Commands\Experiment;
 
-class ExperimentModificationResult
+class ExperimentQueryResult
 {
     public function __construct(
         public string $query,
-        public float $score,
+        public ExperimentScores $scores,
         public int $queryTime,
     )
     {

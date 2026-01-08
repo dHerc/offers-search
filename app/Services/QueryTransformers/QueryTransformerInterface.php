@@ -10,7 +10,7 @@ interface QueryTransformerInterface
     /**
      * @param string $query
      * @param Collection<Offer> $results
-     * @return string|string[]
+     * @return string[]
      */
-    public function transform(string $query, Collection $results): string | array;
+    public function transform(string $query, Collection $results): array;
 }

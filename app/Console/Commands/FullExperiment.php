@@ -12,8 +12,12 @@ use App\Services\QueryTransformers\FlanPRFQueryTransformer;
 use App\Services\QueryTransformers\FlanQRQueryTransformer;
 use App\Services\QueryTransformers\NGramsQueryTransformer;
 use App\Services\QueryTransformers\QueryTransformerInterface;
+use App\Services\QueryTransformers\QueryWordCountCBPHybridTransformer;
+use App\Services\QueryTransformers\QueryWordCountCBZHybridTransformer;
+use App\Services\QueryTransformers\QueryWordCountSnipHybridTransformer;
 use App\Services\QueryTransformers\RemoveWordQueryTransformer;
 use App\Services\QueryTransformers\ReorderWordsQueryTransformer;
+use App\Services\QueryTransformers\ResultCountHybridTransformer;
 use App\Services\QueryTransformers\SnippetsQueryTransformer;
 use App\Services\QueryTransformers\ToBaseWordQueryTransformer;
 use App\Services\ScoringService;
@@ -39,6 +43,10 @@ class FullExperiment extends Command
         'bm25_rm3' => BM25RM3QueryTransformer::class,
         'flan_qr' => FlanQRQueryTransformer::class,
         'flan_prf' => FlanPRFQueryTransformer::class,
+        'hybrid_result_count' => ResultCountHybridTransformer::class,
+        'hybrid_word_count_cbp' => QueryWordCountCBPHybridTransformer::class,
+        'hybrid_word_count_cbz' => QueryWordCountCBZHybridTransformer::class,
+        'hybrid_word_count_snip' => QueryWordCountSnipHybridTransformer::class,
     ];
     /**
      * The name and signature of the console command.
@@ -72,7 +80,7 @@ class FullExperiment extends Command
                 throw new \RuntimeException("No transformer found for given option: $option");
             }
             $transformer = new $transformer();
-            $queries = explode("\n", Storage::disk('local')->get('testing_queries-full.txt'));
+            $queries = explode("\n", Storage::disk('local')->get('testing_queries.txt'));
             $file = fopen(storage_path("app/private/$option-results.ndjson"), 'a');
             foreach ($queries as $query) {
                 echo "processing $query\n";
@@ -82,7 +90,7 @@ class FullExperiment extends Command
                 $handler = new Experiment();
                 $results = $handler->runExperiment($transformer, $query);
                 foreach ($results as $result) {
-                    $resultData = json_encode($result);
+                    $resultData = json_encode($result, JSON_THROW_ON_ERROR);
                     fwrite($file, $resultData . PHP_EOL);
                 }
             }

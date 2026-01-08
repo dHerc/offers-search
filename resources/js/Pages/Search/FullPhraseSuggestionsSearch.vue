@@ -5,12 +5,13 @@ import {PropType, Ref, ref, watch} from "vue";
 import SearchLayout from "@/Pages/Search/SearchLayout.vue";
 import {router} from "@inertiajs/vue3";
 
-const { search, offers, suggestions, time, title } = defineProps({
+const { search, offers, suggestions, time, title, score } = defineProps({
     offers: Object as PropType<PagedOffers>,
     search: String,
     suggestions: Array<string>,
     time: Number,
-    title: String
+    title: String,
+    score: Number,
 })
 
 const currentSearch = ref(search);
@@ -29,18 +30,18 @@ const submit = (event: KeyboardEvent | Event) => {
         return;
     }
     loadingSearch.value = true;
-    router.get(window.location.href, { search: currentSearch.value }, { preserveState: true });
+    router.get(window.location.href, { search: currentSearch.value, page: undefined }, { preserveState: true });
 }
 
 const updateSearch = (value: string) => {
     loadingSearch.value = true;
     currentSearch.value = value;
-    router.get(window.location.href, { search: value }, { preserveState: true });
+    router.get(window.location.href, { search: value, page: undefined }, { preserveState: true });
 }
 </script>
 
 <template>
-   <SearchLayout :offers="offers" :title="title" :search="search" :loadingSearch="loadingSearch" :time="time">
+   <SearchLayout :offers="offers" :title="title" :search="search" :loadingSearch="loadingSearch" :time="time" :score="score">
        <form
            method="get"
            class="grid items-center p-2 text-gray-900 dark:text-gray-100"
@@ -56,11 +57,12 @@ const updateSearch = (value: string) => {
            >Search</button>
        </form>
        <div
-           v-if="suggestions"
-           class="w-full transition-[max-height] transition-padding duration-500 grid items-center text-center content-center grid-cols-1 pr-2 pl-2 text-gray-900 dark:text-gray-100 overflow-hidden"
+           v-if="suggestions && suggestions.length"
+           class="w-full transition-[max-height] transition-padding duration-500 delay-200 grid items-center text-center content-center grid-cols-1 pr-2 pl-2 text-gray-900 dark:text-gray-100 overflow-hidden"
            :style="{ 'max-height': searchFocus ? '500px' : '0px' }"
        >
-           Choose new search phrase:
+           <span v-if="suggestions.length === 1">Try searching for:</span>
+           <span v-else>Choose new search phrase:</span>
            <button
                class="p-2 mx-2 border sm:rounded-lg shadow-sm hover:bg-gray-500
                             bg-gray-100 shadow-gray-600 active:bg-gray-100

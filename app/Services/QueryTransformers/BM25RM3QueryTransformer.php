@@ -13,7 +13,7 @@ class BM25RM3QueryTransformer implements QueryTransformerInterface
      * @param Collection $results
      * @inheritDoc
      */
-    public function transform(string $query, ?Collection $results = null): string|array
+    public function transform(string $query, ?Collection $results = null): array
     {
         $options = BM25RM3Service::getSuggestions($query);
         return array_map(fn ($item) => "$query $item", $options);

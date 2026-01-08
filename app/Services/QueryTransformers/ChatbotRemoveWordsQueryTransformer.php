@@ -16,7 +16,7 @@ class ChatbotRemoveWordsQueryTransformer implements QueryTransformerInterface
     {
         $service = new ChatbotService();
         return $service->query(
-            'Please generate suggestions for removing parts the following search query',
+            'Please generate suggestions for removing parts of the following search query',
             $query,
             ['do not alter the existing words in the query', 'you can remove any words in any place in the query']
         );

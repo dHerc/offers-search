@@ -4,26 +4,19 @@ namespace App\Console\Commands\Experiment;
 
 use App\Services\QueryTransformers\QueryTransformerInterface;
 
-class ExperimentResult
+class ExperimentResult extends ExperimentQueryResult
 {
-    /**
-     * @param 'embedding'|'fulltext' $type
-     * @param class-string<QueryTransformerInterface> $method
-     * @param string $query
-     * @param float $score
-     * @param int $queryTime
-     * @param int $suggestionTime
-     * @param ExperimentModificationResult[] $suggestions
-     */
     public function __construct(
-        public string $type,
+        public ExperimentType $type,
         public string $method,
-        public string $query,
-        public float $score,
-        public int $queryTime,
+        string $query,
+        ExperimentScores $scores,
+        int $queryTime,
         public int $suggestionTime,
+        public int $fullTime,
         public array $suggestions = [],
     )
     {
+        parent::__construct($query, $scores, $queryTime);
     }
 }

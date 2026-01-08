@@ -33,8 +33,6 @@ class Import extends Command
     public function handle()
     {
         ini_set('memory_limit', '1G');
-        //Offer::query()->truncate();
-        $start = Offer::query()->count('id');
         $files = Storage::disk('amazon_data')->files();
 		foreach ($files as $gzip) {
 			$uncompressedFileName = substr($gzip, 0, strlen($gzip) - 3);
@@ -61,7 +59,6 @@ class Import extends Command
 					'description' => is_array($description) ? implode("\n", $description) : (string)$description,
 					'details' => $this->generateDetails($data['details']),
 				];
-                //$embeddings = EmbeddingService::generateEmbeddings($fixedFullData);
                 $batch[] = $fixedData;
                 if (count($batch) >= self::BATCH_LIMIT) {
                     $this->insertBatch($batch);
@@ -79,19 +76,6 @@ class Import extends Command
 
     private function insertBatch(array $offersData): void {
         $data = [];
-//        foreach ($offersData as $offerData) {
-//            /** @var ?Response $embeddingsResponse */
-//            $embeddingsResponse = $offerData['embeddingsPromise']->wait();
-//            if (!$embeddingsResponse) {
-//                $this->failedToLoad++;
-//                return;
-//            }
-//            $embeddings = $embeddingsResponse->getBody()->getContents();
-//            $data[] = [
-//                ...$offerData['data'],
-//                'embeddings' => "[$embeddings]",
-//            ];
-//        }
         $embeddings = $this->getEmbeddings(
             array_map(fn ($offer) => implode('\n', $offer), $offersData)
         );

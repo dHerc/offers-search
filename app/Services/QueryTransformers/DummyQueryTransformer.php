@@ -6,8 +6,8 @@ use Illuminate\Database\Eloquent\Collection;
 
 class DummyQueryTransformer implements QueryTransformerInterface
 {
-    public function transform(string $query, Collection $results): string
+    public function transform(string $query, Collection $results): array
     {
-        return $query;
+        return [$query];
     }
 }
